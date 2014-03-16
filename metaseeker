@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+#    Meta Seeker
+#    Copyright (C) 2014 Chad Wade Day, Jr.
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License along
+#    with this program; if not, write to the Free Software Foundation, Inc.,
+#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+#
+
+
+dir=$(mktemp -dt metaseeker.XXXXXXXXXXXX)
+touch $dir/temp.csv
+touch $dir/temp.html
+if [[ "$1" =~ ^https?:// ]]; then
+    root=$(echo $1 | sed -e 's/^\(https\?:\/\/[^\ \t;]*\).*$/\1/i')
+    linkchecker -o csv $root > $dir/temp.csv
+else
+    cat $1 > $dir/temp.csv
+    root='https\?://'
+fi
+echo -e "Title\tURL\tDescription\tKeywords"
+while read line
+do
+    url=$(echo "$line" | sed -e 's/^\(https\?:\/\/[^\ \t;]*\).*$/\1/i')
+    if ! [[ $(echo $url | grep ^$root) ]] ; then
+        continue
+    fi
+    curl -o $dir/temp.html $url &> /dev/null
+    title=$(cat $dir/temp.html | grep -i '<title>' | sed -e 's/<title.*>\(.*\)<\/title>/\1/i')
+    description=$(cat $dir/temp.html | grep -i "<meta.*name=[\"']\?description[\"'\s]\?" | 
+    sed -e "s/^.*<meta.*content=[\"']\(.*\)[\"'].*$/\1/i")
+    keywords=$(cat $dir/temp.html | grep -i "<meta.*name=[\"']\?keywords[\"'\s]\?" | 
+    sed -e "s/^.*<meta.*content=[\"']\(.*\)[\"'].*$/\1/i")
+    echo -e "$title\t$url\t$description\t$keywords"
+done < $dir/temp.csv
+rm -rf $dir
